@@ -86,15 +86,3 @@ struct conf read_config(const char* filename) {
     return cfg;
 }
 
-// ---- Ejemplo de uso ----
-int main() {
-    struct conf cfg = read_config("server.conf");
-
-    printf("Puerto: %d\n", cfg.port);
-    printf("Nivel log: %s\n", cfg.log_level);
-    printf("Histograma: %s\n", cfg.histograma);
-    printf("Colores: %s\n", cfg.colores);
-    printf("Log file: %s\n", cfg.log_file);
-
-    return 0;
-}
