@@ -41,34 +41,70 @@ void deamon() {
   dup(fd);
 }
 
-// Función para manejar cada cliente en un hilo separado
 void *handle_client(void *arg) {
   int client_socket = *(int *)arg;
-  free(arg); // Liberamos la memoria del argumento
+  free(arg); // Liberar el puntero recibido
 
-  char buffer[BUFFER_SIZE];
-  int bytes_received;
-
-  // Recibir datos del cliente
-  bytes_received = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
-  if (bytes_received > 0) {
-    buffer[bytes_received] = '\0'; // Null-terminate the string
-
-    // Registrar en el log
-    FILE *log = fopen("/var/log/imageserver.log", "a+");
-    if (log) {
-      time_t now = time(NULL);
-      fprintf(log, "Cliente conectado - Mensaje recibido (%d bytes): %s - %s",
-              bytes_received, buffer, ctime(&now));
-      fclose(log);
-    }
-
-    // Enviar respuesta al cliente
-    char response[] = "Servidor: Mensaje recibido correctamente\n";
-    send(client_socket, response, strlen(response), 0);
+  FILE *outfile = fopen("received_image.jpg", "wb");
+  if (!outfile) {
+    perror("No se pudo crear el archivo de imagen");
+    close(client_socket);
+    return NULL;
   }
 
+  int block_size;
+  char buffer[BUFFER_SIZE];
+  int total_received = 0;
+
+  while (1) {
+    // Leer tamaño del bloque (4 bytes)
+    int net_block_size;
+    int read_bytes =
+        recv(client_socket, &net_block_size, sizeof(net_block_size), 0);
+    if (read_bytes <= 0) {
+      perror("Error leyendo el tamaño del bloque");
+      break;
+    }
+
+    block_size = ntohl(net_block_size); // Convertir a orden de bytes del host
+
+    if (block_size == 0) {
+      // Fin de transmisión
+      break;
+    }
+
+    // Leer los datos del bloque
+    int bytes_remaining = block_size;
+    while (bytes_remaining > 0) {
+      int chunk_size =
+          bytes_remaining > BUFFER_SIZE ? BUFFER_SIZE : bytes_remaining;
+      int received = recv(client_socket, buffer, chunk_size, 0);
+      if (received <= 0) {
+        perror("Error leyendo los datos del bloque");
+        fclose(outfile);
+        close(client_socket);
+        return NULL;
+      }
+
+      fwrite(buffer, 1, received, outfile);
+      total_received += received;
+      bytes_remaining -= received;
+    }
+  }
+
+  fclose(outfile);
   close(client_socket);
+
+  // Registrar en el log
+  FILE *log = fopen("/var/log/imageserver.log", "a+");
+  if (log) {
+    time_t now = time(NULL);
+    fprintf(log, "Imagen recibida: %d bytes - %s\n", total_received,
+            ctime(&now));
+    fclose(log);
+  }
+
+  printf("Imagen recibida correctamente (%d bytes)\n", total_received);
   return NULL;
 }
 
