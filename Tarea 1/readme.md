@@ -1,6 +1,6 @@
 **Tarea 1: Servidor y Cliente**
 
-## Instrucciones
+## Instrucciones Server
 ```bash
 cd ./Tarea\ 1/
 make
@@ -10,6 +10,17 @@ sudo cp ./Service/ImagServer.conf /etc/ImagServer.conf
 sudo touch /var/log/imageserver.log
 sudo systemctl start ImagServer.service
 sudo systemctl status ImagServer.service
+```
+
+## Instrucciones Server
+```bash
+docker build -t image_client .
+sudo docker run --rm -it \
+  --add-host=host.docker.internal:host-gateway \
+  -v "$(pwd)/imgs:/app/imgs" \
+  --entrypoint /bin/sh \
+  image_client
+./client
 ```
 
 ## Otras instrucciones utiles
