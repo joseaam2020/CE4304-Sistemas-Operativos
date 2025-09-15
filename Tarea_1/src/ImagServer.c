@@ -138,7 +138,7 @@ void start_server(struct conf cfg) {
 
     int opt = 1;
     if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-        FILE *log = fopen(cfg.log_file[0] ? cfg.log_file : "/~home/Desktop/TEC/Operativos/Tarea2/CE4304-Sistemas-Operativos/Tarea_1/src/imageserver.log", "a+");
+        FILE *log = fopen(cfg.log_file[0] ? cfg.log_file : "/home/Desktop/TEC/Operativos/Tarea2/CE4304-Sistemas-Operativos/Tarea_1/src/imageserver.log", "a+");
         if (log) {
             fprintf(log, "Error al setear SO_REUSEADDR\n");
             fclose(log);
@@ -189,6 +189,7 @@ void start_server(struct conf cfg) {
     }
 
     close(server_socket);
+
 }
 
 //--------------------------------------------------------------------------------

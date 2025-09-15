@@ -75,6 +75,7 @@ struct conf read_config(const char* filename) {
         } else if (strncmp(ptr, "LOG_FILE=", 9) == 0) {
             strncpy(cfg.log_file, ptr + 9, MAX_PATH - 1);
             cfg.log_file[strcspn(cfg.log_file, "\r\n")] = 0;
+
         }
     }
 
@@ -85,5 +86,3 @@ struct conf read_config(const char* filename) {
 
     return cfg;
 }
-
-
