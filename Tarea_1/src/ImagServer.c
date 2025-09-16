@@ -1,6 +1,7 @@
 #include "Conf_lect.h" // Aquí está la definición de struct conf y read_config()
 #include "histograma.h"
 #include <arpa/inet.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -46,6 +47,26 @@ void deamon() {
   dup(fd);
 }
 
+int get_next_image_number(const char *directory) {
+  DIR *dir = opendir(directory);
+  if (!dir)
+    return 1; // Si no se puede abrir, empezamos desde 1
+
+  struct dirent *entry;
+  int max_number = 0;
+
+  while ((entry = readdir(dir)) != NULL) {
+    int num;
+    if (sscanf(entry->d_name, "received_image_%d.jpg", &num) == 1) {
+      if (num > max_number)
+        max_number = num;
+    }
+  }
+
+  closedir(dir);
+  return max_number + 1;
+}
+
 void *handle_client(void *arg) {
   struct thread_args *args = (struct thread_args *)arg;
   int client_socket = args->client_socket;
@@ -53,8 +74,9 @@ void *handle_client(void *arg) {
   free(arg); // liberar memoria después de copiar los valores
 
   char image_path[MAX_PATH + 64];
-  snprintf(image_path, sizeof(image_path), "%s/received_image.jpg",
-           cfg.histograma);
+  int next_id = get_next_image_number(cfg.histograma);
+  snprintf(image_path, sizeof(image_path), "%s/received_image_%d.jpg",
+           cfg.histograma, next_id);
 
   FILE *outfile = fopen(image_path, "wb");
   if (!outfile) {
