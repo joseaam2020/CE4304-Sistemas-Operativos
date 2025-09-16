@@ -1,131 +1,110 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
+#include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
-#define MAX_PATH 1024
-#define MAX_VALUE 256
+// Clasifica una imagen por color predominante (rojo, verde o azul)
+// Retorna una cadena constante ("rojo", "verde", "azul") o NULL si falla
+const char *clasificar(const char *archivo) {
+  int width, height, channels;
 
-// --- Estructura de configuración ---
-struct conf {
-    int port;
-    char log_level[32];
-    char histograma[MAX_PATH];
-    char colores[MAX_PATH];
-    char log_file[MAX_PATH];
-    char rojo[MAX_PATH];
-    char verde[MAX_PATH];
-    char azul[MAX_PATH];
-};
+  // 3 canales (RGB)
+  unsigned char *img = stbi_load(archivo, &width, &height, &channels, 3);
+  if (!img) {
+    fprintf(stderr, "Error al cargar la imagen %s\n", archivo);
+    return NULL;
+  }
 
-// --- Parser de .conf ---
-struct conf read_config(const char* filename) {
-    struct conf cfg;
+  uint64_t totalR = 0, totalG = 0, totalB = 0;
+  int num_pixels = width * height;
 
-    // valores por defecto
-    cfg.port = 1717;
-    strcpy(cfg.log_level, "INFO");
-    strcpy(cfg.histograma, "");
-    strcpy(cfg.colores, "");
-    strcpy(cfg.log_file, "");
-    strcpy(cfg.rojo, "");
-    strcpy(cfg.verde, "");
-    strcpy(cfg.azul, "");
+  for (int i = 0; i < num_pixels * 3; i += 3) {
+    totalR += img[i + 0];
+    totalG += img[i + 1];
+    totalB += img[i + 2];
+  }
 
-    FILE* file = fopen(filename, "r");
-    if (!file) return cfg;
-    char line[512];
-    while (fgets(line, sizeof(line), file)) {
-        char* comment = strchr(line, '#');
-        if (comment) *comment = '\0';
-        char* ptr = line;
-        while (*ptr == ' ' || *ptr == '\t') ptr++;
+  stbi_image_free(img);
 
-        if (strncmp(ptr, "PORT=", 5) == 0) {
-            ptr += 5; cfg.port = atoi(ptr);
-        } else if (strncmp(ptr, "LOG_LEVEL=", 10) == 0) {
-            ptr += 10; strncpy(cfg.log_level, ptr, 31); cfg.log_level[strcspn(cfg.log_level, "\r\n")] = 0;
-        } else if (strncmp(ptr, "HISTOGRAMA=", 11) == 0) {
-            ptr += 11; strncpy(cfg.histograma, ptr, MAX_PATH-1); cfg.histograma[strcspn(cfg.histograma, "\r\n")] = 0;
-        } else if (strncmp(ptr, "COLORES=", 8) == 0) {
-            ptr += 8; strncpy(cfg.colores, ptr, MAX_PATH-1); cfg.colores[strcspn(cfg.colores, "\r\n")] = 0;
-        } else if (strncmp(ptr, "ROJO=", 5) == 0) {
-            ptr += 5; strncpy(cfg.rojo, ptr, MAX_PATH-1); cfg.rojo[strcspn(cfg.rojo, "\r\n")] = 0;
-        } else if (strncmp(ptr, "VERDE=", 6) == 0) {
-            ptr += 6; strncpy(cfg.verde, ptr, MAX_PATH-1); cfg.verde[strcspn(cfg.verde, "\r\n")] = 0;
-        } else if (strncmp(ptr, "AZUL=", 5) == 0) {
-            ptr += 5; strncpy(cfg.azul, ptr, MAX_PATH-1); cfg.azul[strcspn(cfg.azul, "\r\n")] = 0;
-        } else if (strncmp(ptr, "LOG_FILE=", 9) == 0) {
-            ptr += 9; strncpy(cfg.log_file, ptr, MAX_PATH-1); cfg.log_file[strcspn(cfg.log_file, "\r\n")] = 0;
-        }
-    }
-        
-
-    fclose(file);
-    printf("Rutas leídas:\nROJO='%s'\nVERDE='%s'\nAZUL='%s'\n", cfg.rojo, cfg.verde, cfg.azul);
-    return cfg;
+  if (totalR >= totalG && totalR >= totalB) {
+    return "rojo";
+  } else if (totalG >= totalR && totalG >= totalB) {
+    return "verde";
+  } else {
+    return "azul";
+  }
 }
 
-// --- Función principal ---
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        printf("Uso: %s <nombre_imagen>\n", argv[0]);
-        return 1;
+void ecualizar_histograma_rgb(const char *path) {
+  int width, height, channels;
+
+  // Cargar imagen en formato RGB (3 canales)
+  unsigned char *img = stbi_load(path, &width, &height, &channels, 3);
+  if (img == NULL) {
+    printf("Error al cargar la imagen: %s\n", path);
+    return;
+  }
+
+  printf("Imagen cargada: %s (%dx%d)\n", path, width, height);
+
+  int num_pixels = width * height;
+  int hist[3][256] = {{0}};
+  int cdf[3][256] = {{0}};
+  unsigned char lut[3][256];
+
+  // Calcular histogramas
+  for (int i = 0; i < num_pixels; i++) {
+    hist[0][img[3 * i + 0]]++;
+    hist[1][img[3 * i + 1]]++;
+    hist[2][img[3 * i + 2]]++;
+  }
+
+  // Calcular CDFs y LUTs
+  for (int c = 0; c < 3; c++) {
+    cdf[c][0] = hist[c][0];
+    for (int i = 1; i < 256; i++) {
+      cdf[c][i] = cdf[c][i - 1] + hist[c][i];
     }
 
-    char *archivo = argv[1];
-    struct conf cfg = read_config("imageserver.conf");
-
-    int width, height, channels;
-    unsigned char *img = stbi_load(archivo, &width, &height, &channels, 3);
-    if (!img) {
-        printf("Error al cargar la imagen %s\n", archivo);
-        return 1;
+    // Buscar primer valor no cero
+    int cdf_min = 0;
+    for (int i = 0; i < 256; i++) {
+      if (cdf[c][i] != 0) {
+        cdf_min = cdf[c][i];
+        break;
+      }
     }
 
-    int histR[MAX_VALUE] = {0}, histG[MAX_VALUE] = {0}, histB[MAX_VALUE] = {0};
-
-    for (int i = 0; i < width * height * 3; i += 3) {
-        unsigned char r = img[i + 0];
-        unsigned char g = img[i + 1];
-        unsigned char b = img[i + 2];
-
-        histR[r]++; histG[g]++; histB[b]++;
+    // Crear LUT
+    for (int i = 0; i < 256; i++) {
+      lut[c][i] = (unsigned char)(((float)(cdf[c][i] - cdf_min) /
+                                   (num_pixels - cdf_min)) *
+                                      255.0f +
+                                  0.5f);
     }
+  }
 
-    stbi_image_free(img);
+  // Aplicar LUTs a la imagen
+  for (int i = 0; i < num_pixels; i++) {
+    img[3 * i + 0] = lut[0][img[3 * i + 0]];
+    img[3 * i + 1] = lut[1][img[3 * i + 1]];
+    img[3 * i + 2] = lut[2][img[3 * i + 2]];
+  }
 
-    long sumR = 0, sumG = 0, sumB = 0;
-    for (int i = 0; i < MAX_VALUE; i++) {
-        sumR += histR[i] * i;
-        sumG += histG[i] * i;
-        sumB += histB[i] * i;
-    }
+  // Crear nuevo nombre para la imagen ecualizada
+  char output_path[512];
+  snprintf(output_path, sizeof(output_path), "%s", path);
 
-    printf("Total de píxeles ponderados:\nR: %ld\nG: %ld\nB: %ld\n", sumR, sumG, sumB);
+  // Guardar imagen en PNG
+  if (!stbi_write_png(output_path, width, height, 3, img, width * 3)) {
+    printf("Error al guardar la imagen ecualizada.\n");
+  } else {
+    printf("Imagen ecualizada guardada en: %s\n", output_path);
+  }
 
-    char destino[MAX_PATH];
-    char color[16];
-
-    if (sumR >= sumG && sumR >= sumB) {
-        strcpy(color, "rojo");
-        snprintf(destino, sizeof(destino), "%s/%s", cfg.rojo, archivo);
-    } else if (sumG >= sumR && sumG >= sumB) {
-        strcpy(color, "verde");
-        snprintf(destino, sizeof(destino), "%s/%s", cfg.verde, archivo);
-    } else {
-        strcpy(color, "azul");
-        snprintf(destino, sizeof(destino), "%s/%s", cfg.azul, archivo);
-    }
-
-    printf("Color predominante: %s\n", color);
-
-    if (rename(archivo, destino) == 0) {
-        printf("Imagen movida a %s\n", destino);
-    } else {
-        perror("Error moviendo la imagen");
-    }
-
-    return 0;
+  stbi_image_free(img);
 }

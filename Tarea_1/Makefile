@@ -9,10 +9,10 @@ BUILD_DIR = build
 CFLAGS = -Wall -Wextra -g
 
 # Librerías para el servidor
-LIBS_SERVER = -lpthread
+LIBS_SERVER = -lpthread -lm
 
 # Archivos fuente
-SERVER_SRCS = $(SRC_DIR)/ImagServer.c $(SRC_DIR)/Conf_lect.c
+SERVER_SRCS = $(SRC_DIR)/ImagServer.c $(SRC_DIR)/Conf_lect.c $(SRC_DIR)/histograma.c
 CLIENT_SRCS = $(SRC_DIR)/client.c
 
 # Ejecutables
