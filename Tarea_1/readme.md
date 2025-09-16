@@ -14,7 +14,7 @@ sudo systemctl status ImagServer.service
 
 ## Instrucciones Server
 ```bash
-docker build -t image_client .
+sudo docker build -t image_client .
 sudo docker run --rm -it \
   --add-host=host.docker.internal:host-gateway \
   -v "$(pwd)/imgs:/app/imgs" \
