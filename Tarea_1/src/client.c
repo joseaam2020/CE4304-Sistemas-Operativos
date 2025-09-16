@@ -62,12 +62,6 @@ int main() {
   printf("Enter port number (e.g., 1717): ");
   scanf("%d", &port);
 
-  // Solicitar nombre del archivo
-  printf("Enter image filename (e.g., photo.jpg): ");
-  scanf("%s", image_name);
-
-  // Crear la ruta completa con el prefijo "imgs/"
-  snprintf(filename, sizeof(filename), "imgs/%s", image_name);
   char cwd[PATH_MAX];
 
   if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -99,8 +93,24 @@ int main() {
 
   printf("Connected to the server.\n");
 
-  // Enviar la imagen
-  send_image(sockfd, filename);
+  while (1) {
+    // Solicitar nombre del archivo
+    printf("Enter image filename (e.g., photo.jpg): ");
+    scanf("%s", image_name);
+
+    if (strcmp(image_name, "exit") == 0) {
+      printf("Exiting...\n");
+      break;
+    }
+
+    // Crear la ruta completa con el prefijo "imgs/"
+    snprintf(filename, sizeof(filename), "imgs/%s", image_name);
+
+    // Enviar la imagen
+    uint32_t start_image_flag = htonl(1);
+    write(sockfd, &start_image_flag, sizeof(start_image_flag));
+    send_image(sockfd, filename);
+  }
 
   // Cerrar la conexión
   close(sockfd);

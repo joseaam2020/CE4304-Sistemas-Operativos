@@ -73,141 +73,165 @@ void *handle_client(void *arg) {
   struct conf cfg = args->cfg;
   free(arg); // liberar memoria después de copiar los valores
 
-  char image_path[MAX_PATH + 64];
-  int next_id = get_next_image_number(cfg.histograma);
-  snprintf(image_path, sizeof(image_path), "%s/received_image_%d.jpg",
-           cfg.histograma, next_id);
-
-  FILE *outfile = fopen(image_path, "wb");
-  if (!outfile) {
-    perror("No se pudo crear el archivo de imagen");
-    close(client_socket);
-    return NULL;
-  }
-
-  int block_size;
-  char buffer[BUFFER_SIZE];
-  int total_received = 0;
-
   while (1) {
-    // Leer tamaño del bloque (4 bytes)
-    int net_block_size;
-    int read_bytes =
-        recv(client_socket, &net_block_size, sizeof(net_block_size), 0);
-    if (read_bytes <= 0) {
-      perror("Error leyendo el tamaño del bloque");
-      break;
+    uint32_t start_image_flag;
+    int read_flag =
+        recv(client_socket, &start_image_flag, sizeof(start_image_flag), 0);
+    if (read_flag <= 0) {
+      break; // Cliente cerró la conexión o error
     }
 
-    block_size = ntohl(net_block_size); // Convertir a orden de bytes del host
-
-    if (block_size == 0) {
-      // Fin de transmisión
-      break;
+    if (ntohl(start_image_flag) != 1) {
+      FILE *log = fopen(
+          cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log", "a+");
+      if (log) {
+        time_t now = time(NULL);
+        fprintf(log, "Valor inesperado de header: %d bytes - %s\n",
+                ntohl(start_image_flag), ctime(&now));
+        fclose(log);
+      }
+      continue;
     }
 
-    // Leer los datos del bloque
-    int bytes_remaining = block_size;
-    while (bytes_remaining > 0) {
-      int chunk_size =
-          bytes_remaining > BUFFER_SIZE ? BUFFER_SIZE : bytes_remaining;
-      int received = recv(client_socket, buffer, chunk_size, 0);
-      if (received <= 0) {
-        perror("Error leyendo los datos del bloque");
-        fclose(outfile);
-        close(client_socket);
-        return NULL;
+    char image_path[MAX_PATH + 64];
+    int next_id = get_next_image_number(cfg.histograma);
+    snprintf(image_path, sizeof(image_path), "%s/received_image_%d.jpg",
+             cfg.histograma, next_id);
+
+    FILE *outfile = fopen(image_path, "wb");
+    if (!outfile) {
+      perror("No se pudo crear el archivo de imagen");
+      close(client_socket);
+      return NULL;
+    }
+
+    int block_size;
+    char buffer[BUFFER_SIZE];
+    int total_received = 0;
+
+    while (1) {
+      // Leer tamaño del bloque (4 bytes)
+      int net_block_size;
+      int read_bytes =
+          recv(client_socket, &net_block_size, sizeof(net_block_size), 0);
+      if (read_bytes <= 0) {
+        perror("Error leyendo el tamaño del bloque");
+        break;
       }
 
-      fwrite(buffer, 1, received, outfile);
-      total_received += received;
-      bytes_remaining -= received;
+      block_size = ntohl(net_block_size); // Convertir a orden de bytes del host
+
+      if (block_size == 0) {
+        // Fin de transmisión
+        break;
+      }
+
+      // Leer los datos del bloque
+      int bytes_remaining = block_size;
+      while (bytes_remaining > 0) {
+        int chunk_size =
+            bytes_remaining > BUFFER_SIZE ? BUFFER_SIZE : bytes_remaining;
+        int received = recv(client_socket, buffer, chunk_size, 0);
+        if (received <= 0) {
+          perror("Error leyendo los datos del bloque");
+          fclose(outfile);
+          close(client_socket);
+          return NULL;
+        }
+
+        fwrite(buffer, 1, received, outfile);
+        total_received += received;
+        bytes_remaining -= received;
+      }
     }
-  }
 
-  fclose(outfile);
-  close(client_socket);
+    fclose(outfile);
 
-  // Registrar en el log
-  FILE *log =
-      fopen(cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log", "a+");
-  if (log) {
-    time_t now = time(NULL);
-    fprintf(log, "Imagen recibida: %d bytes - %s\n", total_received,
-            ctime(&now));
-    fclose(log);
-  }
-
-  // Clasificar la imagen
-  const char *color = clasificar(image_path);
-  if (color == NULL) {
+    // Registrar en el log
     FILE *log = fopen(
         cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log", "a+");
     if (log) {
-      fprintf(log, "Error clasificando la imagen %s\n", image_path);
+      time_t now = time(NULL);
+      fprintf(log, "Imagen recibida: %d bytes - %s\n", total_received,
+              ctime(&now));
       fclose(log);
     }
-  } else {
-    // Crear carpeta si no existe
-    char new_dir[1024];
-    snprintf(new_dir, sizeof(new_dir), "%s/%s", cfg.colores, color);
 
-    struct stat st = {0};
-    if (stat(new_dir, &st) == -1) {
-      mkdir(new_dir, 0755);
-    }
-
-    // Construir ruta destino
-    char new_path[1024];
-    const char *filename = strrchr(image_path, '/');
-    if (filename) {
-      filename++;
-    } else {
-      filename = image_path;
-    }
-
-    snprintf(new_path, sizeof(new_path), "%s/%s", new_dir, filename);
-
-    FILE *src = fopen(image_path, "rb");
-    if (!src) {
-      perror("No se pudo abrir la imagen original para copiar");
-    } else {
-      FILE *dest = fopen(new_path, "wb");
-      if (!dest) {
-        perror("No se pudo crear el archivo destino para la copia");
-      } else {
-        char copy_buffer[BUFFER_SIZE];
-        size_t bytes;
-        // Copia de imagen en directorio clasificado
-        while ((bytes = fread(copy_buffer, 1, sizeof(copy_buffer), src)) > 0) {
-          fwrite(copy_buffer, 1, bytes, dest);
-        }
-        fclose(dest);
-
-        // Log si la copia fue exitosa
-        FILE *log = fopen(
-            cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log", "a+");
-        if (log) {
-          time_t now = time(NULL);
-          fprintf(log, "Imagen copiada a %s - %s\n", new_path, ctime(&now));
-          fclose(log);
-        }
+    // Clasificar la imagen
+    const char *color = clasificar(image_path);
+    if (color == NULL) {
+      FILE *log = fopen(
+          cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log", "a+");
+      if (log) {
+        fprintf(log, "Error clasificando la imagen %s\n", image_path);
+        fclose(log);
       }
-      fclose(src);
+    } else {
+      // Crear carpeta si no existe
+      char new_dir[1024];
+      snprintf(new_dir, sizeof(new_dir), "%s/%s", cfg.colores, color);
+
+      struct stat st = {0};
+      if (stat(new_dir, &st) == -1) {
+        mkdir(new_dir, 0755);
+      }
+
+      // Construir ruta destino
+      char new_path[1024];
+      const char *filename = strrchr(image_path, '/');
+      if (filename) {
+        filename++;
+      } else {
+        filename = image_path;
+      }
+
+      snprintf(new_path, sizeof(new_path), "%s/%s", new_dir, filename);
+
+      FILE *src = fopen(image_path, "rb");
+      if (!src) {
+        perror("No se pudo abrir la imagen original para copiar");
+      } else {
+        FILE *dest = fopen(new_path, "wb");
+        if (!dest) {
+          perror("No se pudo crear el archivo destino para la copia");
+        } else {
+          char copy_buffer[BUFFER_SIZE];
+          size_t bytes;
+          // Copia de imagen en directorio clasificado
+          while ((bytes = fread(copy_buffer, 1, sizeof(copy_buffer), src)) >
+                 0) {
+            fwrite(copy_buffer, 1, bytes, dest);
+          }
+          fclose(dest);
+
+          // Log si la copia fue exitosa
+          FILE *log =
+              fopen(cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log",
+                    "a+");
+          if (log) {
+            time_t now = time(NULL);
+            fprintf(log, "Imagen copiada a %s - %s\n", new_path, ctime(&now));
+            fclose(log);
+          }
+        }
+        fclose(src);
+      }
+    }
+
+    // Ecualizar histograma
+    ecualizar_histograma_rgb(image_path);
+
+    log = fopen(cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log",
+                "a+");
+    if (log) {
+      time_t now = time(NULL);
+      fprintf(log, "Ecualización aplicada a imagen: %s - %s\n", image_path,
+              ctime(&now));
+      fclose(log);
     }
   }
 
-  // Ecualizar histograma
-  ecualizar_histograma_rgb(image_path);
-
-  log =
-      fopen(cfg.log_file[0] ? cfg.log_file : "/var/log/imageserver.log", "a+");
-  if (log) {
-    time_t now = time(NULL);
-    fprintf(log, "Ecualización aplicada a imagen: %s - %s\n", image_path,
-            ctime(&now));
-    fclose(log);
-  }
+  close(client_socket);
 
   return NULL;
 }
