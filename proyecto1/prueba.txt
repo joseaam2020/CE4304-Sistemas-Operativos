@@ -1,0 +1,4 @@
+shm_name=/memoria
+size=619
+buffer_size=5
+path=prueba.txt
