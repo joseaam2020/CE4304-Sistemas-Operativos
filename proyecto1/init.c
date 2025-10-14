@@ -35,19 +35,24 @@ int main(int argc, char *argv[]) {
   int result = sscanf(argv[3], "%d", &buffer_size);
 
   if (result != 1 || buffer_size <= 0) {
-    fprintf(stderr, "Error: El argumento '%s' no es un número entero positivo válido.\n", argv[3]);
+    fprintf(
+        stderr,
+        "Error: El argumento '%s' no es un número entero positivo válido.\n",
+        argv[3]);
     return EXIT_FAILURE;
   }
 
   if (shm_name[0] != '/') {
-    fprintf(stderr, "Warning: nombre shm debería comenzar con '/'. Continuando de todas formas.\n");
+    fprintf(stderr, "Warning: nombre shm debería comenzar con '/'. Continuando "
+                    "de todas formas.\n");
   }
 
   // 1) Crear/abrir el objeto POSIX shared memory
   int shm_fd = shm_open(shm_name, O_CREAT | O_EXCL | O_RDWR, 0666);
   if (shm_fd == -1) {
     if (errno == EEXIST) {
-      fprintf(stderr, "El objeto de memoria compartida '%s' ya existe.\n", shm_name);
+      fprintf(stderr, "El objeto de memoria compartida '%s' ya existe.\n",
+              shm_name);
     } else {
       perror("shm_open");
     }
@@ -69,7 +74,8 @@ int main(int argc, char *argv[]) {
   }
 
   // 3) Mapear en memoria
-  void *addr = mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+  void *addr =
+      mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
   if (addr == MAP_FAILED) {
     perror("mmap");
     close(shm_fd);
@@ -81,7 +87,8 @@ int main(int argc, char *argv[]) {
   memset(addr, 0, total_size);
 
   struct SharedTable *table = (struct SharedTable *)addr;
-  struct BufferPosition *buffer = (struct BufferPosition *)((char *)addr + table_size);
+  struct BufferPosition *buffer =
+      (struct BufferPosition *)((char *)addr + table_size);
   char *stored_path = (char *)addr + table_size + total_buffer_size;
 
   // Inicializar tabla
@@ -90,12 +97,14 @@ int main(int argc, char *argv[]) {
   table->emiter_index = 0;
   table->receptor_index = 0;
   table->buffer_size = buffer_size;
+  table->finalizado = 0;
 
   // Inicializar semáforos de la tabla
   sem_init(&table->sem_read_pos, 1, 1);
   sem_init(&table->sem_end_program, 1, 1);
   sem_init(&table->sem_emiter_index, 1, 1);
   sem_init(&table->sem_receptor_index, 1, 1);
+  sem_init(&table->sem_finalizado, 1, 1);
 
   // Inicializar posiciones del buffer
   for (int i = 0; i < buffer_size; i++) {
@@ -108,21 +117,6 @@ int main(int argc, char *argv[]) {
 
   // Copiar file_path
   strcpy(stored_path, file_path);
-
-  // 5) Crear archivo de metadatos (opcional)
-  int meta_fd = open(file_path, O_CREAT | O_TRUNC | O_WRONLY, 0644);
-  if (meta_fd == -1) {
-    perror("open(file_path)");
-  } else {
-    char buf[512];
-    int n = snprintf(buf, sizeof(buf),
-                     "shm_name=%s\nsize=%zu\nbuffer_size=%d\npath=%s\n",
-                     shm_name, total_size, buffer_size, file_path);
-    if (n > 0) {
-      write(meta_fd, buf, (size_t)n);
-    }
-    close(meta_fd);
-  }
 
   printf("Memoria compartida creada exitosamente:\n");
   printf("  nombre: %s\n", shm_name);
@@ -138,6 +132,5 @@ int main(int argc, char *argv[]) {
   return EXIT_SUCCESS;
 }
 
-
-//cerrar la memoria: ls -la /dev/shm/    ver cuales estan activas
-//rm /dev/shm/"nombre de la memoria"
+// cerrar la memoria: ls -la /dev/shm/    ver cuales estan activas
+// rm /dev/shm/"nombre de la memoria"
