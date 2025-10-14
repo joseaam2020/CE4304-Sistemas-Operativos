@@ -1,3 +1,21 @@
+//Colores para prints
+#define RESET   "\033[0m"
+#define RED     "\033[1;31m"
+#define GREEN   "\033[1;32m"
+#define YELLOW  "\033[1;33m"
+#define BLUE    "\033[1;34m"
+#define CYAN    "\033[1;36m"
+#define GRAY    "\033[1;90m"
+
+#define BRIGHT_RED      "\033[1;31m"
+#define BRIGHT_GREEN    "\033[1;32m"
+#define BRIGHT_YELLOW   "\033[1;33m"
+#define BRIGHT_BLUE     "\033[1;34m"
+#define BRIGHT_MAGENTA  "\033[1;35m"
+#define BRIGHT_CYAN     "\033[1;36m"
+#define BRIGHT_WHITE    "\033[1;37m"
+
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -90,13 +108,24 @@ int main(int argc, char *argv[]) {
     char c;
     ssize_t nread = pread(file_fd, &c, 1, my_file_pos);
 
+       printf(BLUE "[======================================================]" RESET "\n");
+       printf( BRIGHT_WHITE "[Char original]" RESET " → Resultado: " YELLOW "'%c'" RESET "\n", c);
+       printf(BLUE "[======================================================]" RESET "\n");
+
     //Encriptacion del caractér:
      c^= key;
-        printf("Encriptado: %c\n", c);
-    //desencriptación
-     c^= key;
+
+        printf(BLUE "[======================================================]" RESET "\n");
+        printf(BRIGHT_MAGENTA "[Encriptado]" RESET " → Resultado: " YELLOW "'%c'" RESET "\n", c);
+        printf(BLUE "[======================================================]" RESET "\n");
+
+
+
+     
+
+     //c^= key;
         
-     printf("Encriptado: %c\n", c);
+     //printf("Encriptado: %c\n", c);
 
     close(file_fd);
 
@@ -107,15 +136,26 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    time_t write_time = time(NULL);
+
     // Escribir carácter en su posición del buffer
     sem_wait(&buffer[my_index].sem_write);
 
     buffer[my_index].letter = c;
     buffer[my_index].index = my_index;
-    buffer[my_index].time_stamp = time(NULL);
+    buffer[my_index].time_stamp = write_time;
     sem_post(&buffer[my_index].sem_read);
 
-    printf("[Emisor %d] Escribió '%c' en buffer[%d].\n", my_index, c, my_index);
+    printf("\033[1;34m[======================================================]\033[0m\n");
+    printf("\033[1;36m[Emisor %d]\033[0m → Escribió \033[1;33m'%c'\033[0m en buffer[\033[1;32m%d\033[0m]\n",
+       my_index, c, my_index);
+    printf("\033[1;34m[======================================================]\033[0m\n");
+
+    
+    printf("\033[1;34m[======================================================]\033[0m\n");
+    printf(BRIGHT_RED"[Hora de escritura]-> %s", asctime(localtime(&write_time)));
+    printf("\033[1;34m[======================================================]\033[0m\n");
+
 
     // Limpieza
     munmap(addr, total_size);
