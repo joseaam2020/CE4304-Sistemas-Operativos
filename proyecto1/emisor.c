@@ -18,21 +18,20 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-#include <sys/mman.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <time.h>
 #include <semaphore.h>
 #include <stdint.h>
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
 
 #include "init.h"
 
-
-//Inicializacion
+// Inicializacion
 int main(int argc, char *argv[]) {
     if (argc != 3) {
-        fprintf(stderr, "Uso: %s <shm_name>\n", argv[0]);
+        fprintf(stderr, "Uso: %s <shm_name> <key_encriptacion>\n", argv[0]);
         return 1;
     }
     int key;
@@ -160,6 +159,6 @@ int main(int argc, char *argv[]) {
     // Limpieza
     munmap(addr, total_size);
     close(fd);
+    return 1;
+  }
 
-    return 0;
-}
