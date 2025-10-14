@@ -1,4 +1,4 @@
-shm_name=/memoria
-size=651
-buffer_size=5
+shm_name=/mem
+size=1059
+buffer_size=10
 path=prueba.txt
