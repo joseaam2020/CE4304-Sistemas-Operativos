@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
     buffer[my_index].time_stamp = write_time;
     sem_post(&buffer[my_index].sem_read);
 
-    printf(BRIGHT_CYAN "[Emisor %d]" RESET " → Escribió '%c' en buffer[%d]\n",
+    printf(BRIGHT_CYAN "[Emisor %d]" YELLOW " → Escribió '%c' en buffer[%d]\n",
            my_index, c, my_index);
     printf(BRIGHT_RED "[Hora de escritura] → %s" RESET,
            asctime(localtime(&write_time)));

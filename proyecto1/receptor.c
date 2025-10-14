@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
   const char *shm_name = argv[1];
   const char *modo = argv[3];
   int automatico = 0;
-  int periodo = 1; // valor por defecto
+  int periodo = 1000; // valor por defecto
 
   int key;
   int result = sscanf(argv[2], "%d",&key);
@@ -46,12 +46,13 @@ int main(int argc, char *argv[]) {
 
 
 
+  // Leer modo
   if (strcmp(modo, "manual") == 0) {
     automatico = 0;
   } else if (strcmp(modo, "auto") == 0) {
     automatico = 1;
-    if (argc >= 4) {
-      periodo = atoi(argv[3]);
+    if (argc >= 5) {
+      periodo = atoi(argv[4]);
       if (periodo <= 0) {
         fprintf(stderr, "Error: periodo debe ser un entero positivo.\n");
         return 1;
@@ -61,7 +62,6 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "Error: modo inválido. Use 'manual' o 'auto'.\n");
     return 1;
   }
-
   // Abrir memoria compartida
   int fd = shm_open(shm_name, O_RDWR, 0);
   if (fd == -1) {
@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
     printf(BLUE"[======================================================]" RESET "\n");
     printf(CYAN "[Receptor]" RESET " → Leyó " YELLOW "buffer[%d]" RESET ": '%c'\n", read_index, read_c);
     printf(GREEN "[Hora de lectura]" RESET " → %s", asctime(localtime(&read_time_stamp)));
-    printf(BRIGHT_MAGENTA "[Comparando índices]" RESET " → receptor = " CYAN "%d" RESET ", buffer = " YELLOW "%d" RESET "\n",
+    printf(BRIGHT_MAGENTA "[Comparando índices]" RESET " → receptor = " CYAN "%d" YELLOW ", buffer = " YELLOW "%d" RESET "\n",
        my_index, read_index);
     printf(BRIGHT_RED"[Hora de escritura]→%s", asctime(localtime(&read_time_stamp)));
     printf(BLUE "[======================================================]" RESET "\n");
