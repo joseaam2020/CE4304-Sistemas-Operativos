@@ -5,15 +5,25 @@
 #include <stdlib.h>
 #include <time.h>
 #include <semaphore.h>
+#include <stdint.h>
+
 
 #include "init.h"
 
+
 //Inicializacion
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
+    if (argc != 3) {
         fprintf(stderr, "Uso: %s <shm_name>\n", argv[0]);
         return 1;
     }
+    int key;
+    int result = sscanf(argv[2], "%d",&key);
+    printf("Uso: %d <shm_name>\n", key);
+
+        if (result != 1 || key > 256) {
+            fprintf(stderr, "Error: El argumento '%s' no es un número de 8bits.\n", argv[2]);
+             return EXIT_FAILURE; }
 
     const char *shm_name = argv[1];
 
@@ -56,8 +66,10 @@ int main(int argc, char *argv[]) {
     printf("[INFO] Archivo: %s\n", file_path);
 
     //  Obtener índice para escribir en el buffer
+
     sem_wait(&table->sem_emiter_index);
-    int my_index = table->emiter_index++;
+    int my_index = table->emiter_index;
+    table->emiter_index = (table->emiter_index + 1) % buffer_size;
     sem_post(&table->sem_emiter_index);
 
     printf("[Emisor %d] Iniciado.\n", my_index);
@@ -77,6 +89,15 @@ int main(int argc, char *argv[]) {
     //Lectura del doc y se imprime en el buffer 
     char c;
     ssize_t nread = pread(file_fd, &c, 1, my_file_pos);
+
+    //Encriptacion del caractér:
+     c^= key;
+        printf("Encriptado: %c\n", c);
+    //desencriptación
+     c^= key;
+        
+     printf("Encriptado: %c\n", c);
+
     close(file_fd);
 
     if (nread != 1) {
@@ -90,12 +111,11 @@ int main(int argc, char *argv[]) {
     sem_wait(&buffer[my_index].sem_write);
 
     buffer[my_index].letter = c;
-    buffer[my_index].index = my_file_pos;
+    buffer[my_index].index = my_index;
     buffer[my_index].time_stamp = time(NULL);
+    sem_post(&buffer[my_index].sem_read);
 
     printf("[Emisor %d] Escribió '%c' en buffer[%d].\n", my_index, c, my_index);
-
-    sem_post(&buffer[my_index].sem_read);
 
     // Limpieza
     munmap(addr, total_size);
