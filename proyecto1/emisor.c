@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     }
     int key;
     int result = sscanf(argv[2], "%d",&key);
-    printf("Uso: %d <shm_name>\n", key);
+   
 
         if (result != 1 || key > 256) {
             fprintf(stderr, "Error: El argumento '%s' no es un número de 8bits.\n", argv[2]);
@@ -80,7 +80,11 @@ int main(int argc, char *argv[]) {
     struct BufferPosition *buffer = (struct BufferPosition *)((char *)addr + table_size);
     char *file_path = (char *)addr + table_size + buffer_bytes;
 
-    printf("[INFO] Archivo: %s\n", file_path);
+    printf(BLUE "[======================================================]" RESET "\n");
+    printf(BRIGHT_CYAN "[INFO] ]" RESET " → Archivo: %s\n" RESET, file_path);
+    
+
+    
 
     //  Obtener índice para escribir en el buffer
 
@@ -89,7 +93,12 @@ int main(int argc, char *argv[]) {
     table->emiter_index = (table->emiter_index + 1) % buffer_size;
     sem_post(&table->sem_emiter_index);
 
-    printf("[Emisor %d] Iniciado.\n", my_index);
+    printf(BRIGHT_GREEN "[Emisor %d]" RESET " → Iniciado.\n"RESET, my_index);
+   
+
+
+
+
 
     //  Reservar posición de lectura en el archivo
     sem_wait(&table->sem_read_pos);
@@ -107,16 +116,15 @@ int main(int argc, char *argv[]) {
     char c;
     ssize_t nread = pread(file_fd, &c, 1, my_file_pos);
 
-       printf(BLUE "[======================================================]" RESET "\n");
        printf( BRIGHT_WHITE "[Char original]" RESET " → Resultado: " YELLOW "'%c'" RESET "\n", c);
-       printf(BLUE "[======================================================]" RESET "\n");
+ 
 
     //Encriptacion del caractér:
      c^= key;
 
-        printf(BLUE "[======================================================]" RESET "\n");
+     
         printf(BRIGHT_MAGENTA "[Encriptado]" RESET " → Resultado: " YELLOW "'%c'" RESET "\n", c);
-        printf(BLUE "[======================================================]" RESET "\n");
+       
 
 
 
@@ -145,13 +153,12 @@ int main(int argc, char *argv[]) {
     buffer[my_index].time_stamp = write_time;
     sem_post(&buffer[my_index].sem_read);
 
-    printf("\033[1;34m[======================================================]\033[0m\n");
     printf("\033[1;36m[Emisor %d]\033[0m → Escribió \033[1;33m'%c'\033[0m en buffer[\033[1;32m%d\033[0m]\n",
        my_index, c, my_index);
-    printf("\033[1;34m[======================================================]\033[0m\n");
+   
 
     
-    printf("\033[1;34m[======================================================]\033[0m\n");
+    
     printf(BRIGHT_RED"[Hora de escritura]-> %s", asctime(localtime(&write_time)));
     printf("\033[1;34m[======================================================]\033[0m\n");
 
