@@ -191,6 +191,6 @@ int main(int argc, char *argv[]) {
   munmap(addr, total_size);
   close(fd);
 
-  printf(GREEN "\n[Emisor finalizado correctamente]\n" RESET);
+  printf(BRIGHT_WHITE "\n[Emisor finalizado correctamente]\n" RESET);
   return 0;
 }

@@ -130,13 +130,16 @@ int main(int argc, char *argv[]) {
     char read_c = buffer[my_index].letter;
     printf(CYAN "[Receptor]" RESET " → ENCRIPTADo: " YELLOW "'%c'" RESET "\n", read_c);
 
-
-
     read_c^= key;
+    int transferchar = table-> transfer_char; 
     int read_index = buffer[my_index].index;
     time_t read_time_stamp = buffer[my_index].time_stamp;
-
     sem_post(&buffer[my_index].sem_write);
+
+    sem_wait(&table->sem_transfer_char);
+    table->transfer_char++;
+    sem_post(&table->sem_transfer_char);
+
 
     // Mostrar resultados
     printf(BLUE"[======================================================]" RESET "\n");
@@ -145,6 +148,8 @@ int main(int argc, char *argv[]) {
     printf(BRIGHT_MAGENTA "[Comparando índices]" RESET " → receptor = " CYAN "%d" YELLOW ", buffer = " YELLOW "%d" RESET "\n",
        my_index, read_index);
     printf(BRIGHT_RED"[Hora de escritura]→%s", asctime(localtime(&read_time_stamp)));
+    printf(BRIGHT_GREEN "[Total de caracteres transferidos]→ " BRIGHT_WHITE "%d\n", transferchar);
+
     printf(BLUE "[======================================================]" RESET "\n");
   }
 
@@ -152,6 +157,6 @@ int main(int argc, char *argv[]) {
   munmap(addr, total_size);
   close(fd);
 
-  printf("Receptor finalizado.\n");
+  printf(BRIGHT_WHITE "\n[Receptor finalizado correctamente]\n" RESET);
   return 0;
 }

@@ -1,9 +1,9 @@
 # Nombre de los ejecutables
 BIN_DIR = build
-BINS = $(BIN_DIR)/init $(BIN_DIR)/emisor $(BIN_DIR)/receptor
+BINS = $(BIN_DIR)/init $(BIN_DIR)/emisor $(BIN_DIR)/receptor $(BIN_DIR)/finalizador
 
 # Archivos fuente
-SRCS = init.c emisor.c receptor.c
+SRCS = init.c emisor.c receptor.c finalizador.c
 
 # Compilador y flags
 CC = gcc

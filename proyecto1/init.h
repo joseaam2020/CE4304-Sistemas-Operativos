@@ -27,6 +27,11 @@ struct SharedTable {
   // Senial para finalizar el programa
   short finalizado;
   sem_t sem_finalizado;
+
+  //Contador caracteres transferidos
+  int transfer_char;
+  sem_t sem_transfer_char;
+
 };
 
 // Estructura de cada posición del buffer
