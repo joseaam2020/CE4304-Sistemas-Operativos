@@ -23,6 +23,10 @@ struct SharedTable {
   sem_t sem_receptor_index;
 
   int buffer_size;
+
+  // Senial para finalizar el programa
+  short finalizado;
+  sem_t sem_finalizado;
 };
 
 // Estructura de cada posición del buffer
