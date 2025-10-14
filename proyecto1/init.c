@@ -118,21 +118,6 @@ int main(int argc, char *argv[]) {
   // Copiar file_path
   strcpy(stored_path, file_path);
 
-  // 5) Crear archivo de metadatos (opcional)
-  int meta_fd = open(file_path, O_CREAT | O_TRUNC | O_WRONLY, 0644);
-  if (meta_fd == -1) {
-    perror("open(file_path)");
-  } else {
-    char buf[512];
-    int n = snprintf(buf, sizeof(buf),
-                     "shm_name=%s\nsize=%zu\nbuffer_size=%d\npath=%s\n",
-                     shm_name, total_size, buffer_size, file_path);
-    if (n > 0) {
-      write(meta_fd, buf, (size_t)n);
-    }
-    close(meta_fd);
-  }
-
   printf("Memoria compartida creada exitosamente:\n");
   printf("  nombre: %s\n", shm_name);
   printf("  tamaño total: %zu bytes\n", total_size);
