@@ -11,7 +11,7 @@
 
 int main(int argc, char *argv[]) {
   if (argc < 3) {
-    fprintf(stderr, "Uso: %s <shm_name> <modo: manual|auto> [periodo]\n",
+    fprintf(stderr, "Uso: %s <shm_name> <modo: manual|auto> [periodo ms]\n",
             argv[0]);
     return 1;
   }
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
       while (getchar() != '\n')
         ; // Esperar enter
     } else {
-      sleep(periodo); // Esperar el periodo definido
+      usleep(periodo * 1000); // Esperar el periodo definido
     }
 
     // Verificar finalización
