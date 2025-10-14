@@ -126,10 +126,6 @@ int main(int argc, char *argv[]) {
         printf(BRIGHT_MAGENTA "[Encriptado]" RESET " → Resultado: " YELLOW "'%c'" RESET "\n", c);
        
 
-
-
-     
-
      //c^= key;
         
      //printf("Encriptado: %c\n", c);
