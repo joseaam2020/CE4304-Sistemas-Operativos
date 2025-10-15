@@ -15,7 +15,6 @@
 #define BRIGHT_CYAN "\033[1;36m"
 #define BRIGHT_WHITE "\033[1;37m"
 
-
 #define _POSIX_C_SOURCE 200809L
 #include <errno.h>
 #include <fcntl.h>
@@ -117,7 +116,8 @@ int main(int argc, char *argv[]) {
   table->buffer_size = buffer_size;
   table->finalizado = 0;
   table->transfer_char = 0;
-  
+  table->num_emiters = 0;
+  table->num_receptors = 0;
 
   // Inicializar semáforos de la tabla
   sem_init(&table->sem_read_pos, 1, 1);
@@ -126,6 +126,8 @@ int main(int argc, char *argv[]) {
   sem_init(&table->sem_receptor_index, 1, 1);
   sem_init(&table->sem_finalizado, 1, 1);
   sem_init(&table->sem_transfer_char, 1, 1);
+  sem_init(&table->sem_num_emiters, 1, 1);
+  sem_init(&table->sem_num_receptors, 1, 1);
 
   // Inicializar posiciones del buffer
   for (int i = 0; i < buffer_size; i++) {
@@ -140,14 +142,22 @@ int main(int argc, char *argv[]) {
   strcpy(stored_path, file_path);
   printf(BLUE "[======================================================]" RESET
               "\n");
-  printf(BRIGHT_CYAN "[Sistema]" YELLOW "→ Memoria compartida creada exitosamente:\n");
-  printf("  " BRIGHT_CYAN "• " YELLOW "[Nombre]→" BRIGHT_WHITE "%s\n", shm_name);
-  printf("  " BRIGHT_CYAN "• " YELLOW "[Tamaño total]→" BRIGHT_WHITE "%zu bytes\n", total_size);
-  printf("  " BRIGHT_CYAN "• " YELLOW "[Buffer_size]→" BRIGHT_WHITE "%d posiciones\n", buffer_size);
-  printf("  " BRIGHT_CYAN "• " YELLOW "[Archivo de metadatos]→" BRIGHT_WHITE "%s\n", file_path);
+  printf(BRIGHT_CYAN "[Sistema]" YELLOW
+                     "→ Memoria compartida creada exitosamente:\n");
+  printf("  " BRIGHT_CYAN "• " YELLOW "[Nombre]→" BRIGHT_WHITE "%s\n",
+         shm_name);
+  printf("  " BRIGHT_CYAN "• " YELLOW "[Tamaño total]→" BRIGHT_WHITE
+         "%zu bytes\n",
+         total_size);
+  printf("  " BRIGHT_CYAN "• " YELLOW "[Buffer_size]→" BRIGHT_WHITE
+         "%d posiciones\n",
+         buffer_size);
+  printf("  " BRIGHT_CYAN "• " YELLOW "[Archivo de metadatos]→" BRIGHT_WHITE
+         "%s\n",
+         file_path);
 
   printf(BLUE
-           "[======================================================]\n" RESET); 
+         "[======================================================]\n" RESET);
 
   // Sincronizar y liberar
   msync(addr, total_size, MS_SYNC);
@@ -155,19 +165,7 @@ int main(int argc, char *argv[]) {
   close(shm_fd);
 
   return EXIT_SUCCESS;
-
-
-
-
-
-
-
 }
-
-
-
-
-
 
 // cerrar la memoria: ls -la /dev/shm/    ver cuales estan activas
 // rm /dev/shm/"nombre de la memoria"

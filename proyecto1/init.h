@@ -28,10 +28,17 @@ struct SharedTable {
   short finalizado;
   sem_t sem_finalizado;
 
-  //Contador caracteres transferidos
+  // Contador caracteres transferidos
   int transfer_char;
   sem_t sem_transfer_char;
 
+  // Contador de emisores totales
+  int num_emiters;
+  sem_t sem_num_emiters;
+
+  // Contador de receptores totales
+  int num_receptors;
+  sem_t sem_num_receptors;
 };
 
 // Estructura de cada posición del buffer

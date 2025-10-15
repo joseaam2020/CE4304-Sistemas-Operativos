@@ -1,19 +1,18 @@
-#define RESET   "\033[0m"
-#define RED     "\033[1;31m"
-#define GREEN   "\033[1;32m"
-#define YELLOW  "\033[1;33m"
-#define BLUE    "\033[1;34m"
-#define CYAN    "\033[1;36m"
-#define GRAY    "\033[1;90m"
+#define RESET "\033[0m"
+#define RED "\033[1;31m"
+#define GREEN "\033[1;32m"
+#define YELLOW "\033[1;33m"
+#define BLUE "\033[1;34m"
+#define CYAN "\033[1;36m"
+#define GRAY "\033[1;90m"
 
-#define BRIGHT_RED      "\033[1;31m"
-#define BRIGHT_GREEN    "\033[1;32m"
-#define BRIGHT_YELLOW   "\033[1;33m"
-#define BRIGHT_BLUE     "\033[1;34m"
-#define BRIGHT_MAGENTA  "\033[1;35m"
-#define BRIGHT_CYAN     "\033[1;36m"
-#define BRIGHT_WHITE    "\033[1;37m"
-
+#define BRIGHT_RED "\033[1;31m"
+#define BRIGHT_GREEN "\033[1;32m"
+#define BRIGHT_YELLOW "\033[1;33m"
+#define BRIGHT_BLUE "\033[1;34m"
+#define BRIGHT_MAGENTA "\033[1;35m"
+#define BRIGHT_CYAN "\033[1;36m"
+#define BRIGHT_WHITE "\033[1;37m"
 
 #include <fcntl.h>
 #include <semaphore.h>
@@ -28,7 +27,9 @@
 
 int main(int argc, char *argv[]) {
   if (argc < 4) {
-    fprintf(stderr, "Uso: %s <shm_name> <key_encriptacion> <modo: manual|auto> [periodo ms]\n",
+    fprintf(stderr,
+            "Uso: %s <shm_name> <key_encriptacion> <modo: manual|auto> "
+            "[periodo ms]\n",
             argv[0]);
     return 1;
   }
@@ -39,12 +40,12 @@ int main(int argc, char *argv[]) {
   int periodo = 1000; // valor por defecto
 
   int key;
-  int result = sscanf(argv[2], "%d",&key);
-      if (result != 1 || key > 256) {
-            fprintf(stderr, "Error: El argumento '%s' no es un número de 8bits.\n", argv[2]);
-             return EXIT_FAILURE; }
-
-
+  int result = sscanf(argv[2], "%d", &key);
+  if (result != 1 || key > 256) {
+    fprintf(stderr, "Error: El argumento '%s' no es un número de 8bits.\n",
+            argv[2]);
+    return EXIT_FAILURE;
+  }
 
   // Leer modo
   if (strcmp(modo, "manual") == 0) {
@@ -100,11 +101,17 @@ int main(int argc, char *argv[]) {
   struct BufferPosition *buffer =
       (struct BufferPosition *)((char *)addr + table_size);
 
+  // Actualizar numero de receptores
+  sem_wait(&table->sem_num_receptors);
+  short receptor_id = table->num_receptors++;
+  sem_post(&table->sem_num_receptors);
+
   // Loop principal
   while (1) {
     // Modo manual: esperar enter
     if (!automatico) {
-      printf(BRIGHT_CYAN "[Modo Manual]" RESET " → " YELLOW "Presiona Enter para leer un dato..." RESET "\n");
+      printf(BRIGHT_CYAN "[Modo Manual]" RESET " → " YELLOW
+                         "Presiona Enter para leer un dato..." RESET "\n");
       while (getchar() != '\n')
         ; // Esperar enter
     } else {
@@ -126,31 +133,42 @@ int main(int argc, char *argv[]) {
 
     // Leer datos del buffer
     sem_wait(&buffer[my_index].sem_read);
-
     char read_c = buffer[my_index].letter;
-    printf(CYAN "[Receptor]" RESET " → ENCRIPTADo: " YELLOW "'%c'" RESET "\n", read_c);
-
-    read_c^= key;
-    int transferchar = table-> transfer_char; 
     int read_index = buffer[my_index].index;
     time_t read_time_stamp = buffer[my_index].time_stamp;
     sem_post(&buffer[my_index].sem_write);
 
+    // Desencriptar
+    printf(CYAN "[Receptor %d]" RESET " → ENCRIPTADO: " YELLOW "'%c'" RESET
+                "\n",
+           receptor_id, read_c);
+    read_c ^= key;
+
+    // Sumar a characteres transferidos
     sem_wait(&table->sem_transfer_char);
+    int transferchar = table->transfer_char;
     table->transfer_char++;
     sem_post(&table->sem_transfer_char);
 
-
     // Mostrar resultados
-    printf(BLUE"[======================================================]" RESET "\n");
-    printf(CYAN "[Receptor]" RESET " → Leyó " YELLOW "buffer[%d]" RESET ": '%c'\n", read_index, read_c);
-    printf(GREEN "[Hora de lectura]" RESET " → %s", asctime(localtime(&read_time_stamp)));
-    printf(BRIGHT_MAGENTA "[Comparando índices]" RESET " → receptor = " CYAN "%d" YELLOW ", buffer = " YELLOW "%d" RESET "\n",
-       my_index, read_index);
-    printf(BRIGHT_RED"[Hora de escritura]→%s", asctime(localtime(&read_time_stamp)));
-    printf(BRIGHT_GREEN "[Total de caracteres transferidos]→ " BRIGHT_WHITE "%d\n", transferchar);
+    printf(BLUE "[======================================================]" RESET
+                "\n");
+    printf(CYAN "[Receptor %d]" RESET " → Leyó " YELLOW "buffer[%d]" RESET
+                ": '%c'\n",
+           receptor_id, read_index, read_c);
+    printf(GREEN "[Hora de lectura]" RESET " → %s",
+           asctime(localtime(&read_time_stamp)));
+    printf(BRIGHT_MAGENTA "[Comparando índices]" RESET " → receptor = " CYAN
+                          "%d" YELLOW ", buffer = " YELLOW "%d" RESET "\n",
+           my_index, read_index);
+    printf(BRIGHT_RED "[Hora de escritura]→%s",
+           asctime(localtime(&read_time_stamp)));
+    printf(BRIGHT_GREEN "[Total de caracteres transferidos]→ " BRIGHT_WHITE
+                        "%d\n",
+           transferchar);
 
-    printf(BLUE "[======================================================]" RESET "\n");
+    printf(BLUE "[======================================================]" RESET
+                "\n");
   }
 
   // Limpieza final

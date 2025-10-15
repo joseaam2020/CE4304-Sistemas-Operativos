@@ -123,6 +123,11 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  // Actualizar numero de emisores
+  sem_wait(&table->sem_num_emiters);
+  short emiter_id = table->num_emiters++;
+  sem_post(&table->sem_num_emiters);
+
   // Loop principal
   while (1) {
     if (!automatico) {
@@ -147,7 +152,7 @@ int main(int argc, char *argv[]) {
     table->emiter_index = (table->emiter_index + 1) % buffer_size;
     sem_post(&table->sem_emiter_index);
 
-    printf(BRIGHT_GREEN "[Emisor %d]" RESET " → Iniciado.\n", my_index);
+    printf(BRIGHT_GREEN "[Emisor %d]" RESET " → Iniciado.\n", emiter_id);
 
     // Obtener posición de lectura
     sem_wait(&table->sem_read_pos);
@@ -159,7 +164,7 @@ int main(int argc, char *argv[]) {
     ssize_t nread = pread(file_fd, &c, 1, my_file_pos);
     if (nread != 1) {
       printf(RED "[Emisor %d] Fin del archivo o error de lectura.\n" RESET,
-             my_index);
+             emiter_id);
       break;
     }
 
@@ -179,7 +184,7 @@ int main(int argc, char *argv[]) {
     sem_post(&buffer[my_index].sem_read);
 
     printf(BRIGHT_CYAN "[Emisor %d]" YELLOW " → Escribió '%c' en buffer[%d]\n",
-           my_index, c, my_index);
+           emiter_id, c, my_index);
     printf(BRIGHT_RED "[Hora de escritura] → %s" RESET,
            asctime(localtime(&write_time)));
     printf(BLUE
