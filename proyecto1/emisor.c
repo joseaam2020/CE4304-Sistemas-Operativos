@@ -162,9 +162,11 @@ int main(int argc, char *argv[]) {
     // Leer caracter desde archivo
     char c;
     ssize_t nread = pread(file_fd, &c, 1, my_file_pos);
-    if (nread != 1) {
-      printf(RED "[Emisor %d] Fin del archivo o error de lectura.\n" RESET,
-             emiter_id);
+    if (nread == 0) {
+      printf(RED "[Emisor %d] Fin del archivo.\n" RESET, emiter_id);
+      c = 0;
+    } else if (nread != 1) {
+      printf(RED "[Emisor %d] Error de lectura.\n" RESET, emiter_id);
       break;
     }
 
@@ -189,6 +191,11 @@ int main(int argc, char *argv[]) {
            asctime(localtime(&write_time)));
     printf(BLUE
            "[======================================================]\n" RESET);
+
+    c ^= key;
+
+    if (!c)
+      break;
   }
 
   // Limpieza

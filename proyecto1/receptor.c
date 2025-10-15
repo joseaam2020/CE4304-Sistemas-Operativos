@@ -144,6 +144,10 @@ int main(int argc, char *argv[]) {
            receptor_id, read_c);
     read_c ^= key;
 
+    if (!read_c) {
+      break;
+    }
+
     // Sumar a characteres transferidos
     sem_wait(&table->sem_transfer_char);
     int transferchar = table->transfer_char;
