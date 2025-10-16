@@ -118,6 +118,8 @@ int main(int argc, char *argv[]) {
   table->transfer_char = 0;
   table->num_emiters = 0;
   table->num_receptors = 0;
+  table->num_emiters_closed = 0;
+  table->num_receptors_closed = 0;
 
   // Inicializar semáforos de la tabla
   sem_init(&table->sem_read_pos, 1, 1);
@@ -128,6 +130,10 @@ int main(int argc, char *argv[]) {
   sem_init(&table->sem_transfer_char, 1, 1);
   sem_init(&table->sem_num_emiters, 1, 1);
   sem_init(&table->sem_num_receptors, 1, 1);
+  sem_init(&table->sem_num_emiters_closed, 1, 1);
+  sem_init(&table->sem_num_receptors_closed, 1, 1);
+  sem_init(&table->sem_wait_all_emiters, 1, 0);
+  sem_init(&table->sem_wait_all_receptors, 1, 0);
 
   // Inicializar posiciones del buffer
   for (int i = 0; i < buffer_size; i++) {

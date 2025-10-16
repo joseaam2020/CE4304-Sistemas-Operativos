@@ -197,6 +197,10 @@ int main(int argc, char *argv[]) {
     if (!c)
       break;
   }
+  // Aumentar contador de emisores vivos
+  sem_wait(&table->sem_num_emiters_closed);
+  table->num_emiters_closed++;
+  sem_post(&table->sem_num_emiters_closed);
 
   // Limpieza
   close(file_fd);

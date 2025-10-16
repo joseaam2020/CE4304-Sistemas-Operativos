@@ -36,9 +36,21 @@ struct SharedTable {
   int num_emiters;
   sem_t sem_num_emiters;
 
+  // Contador emisores terminaron de manera correcta
+  int num_emiters_closed;
+  sem_t sem_num_emiters_closed;
+
   // Contador de receptores totales
   int num_receptors;
   sem_t sem_num_receptors;
+
+  // Contador receptores terminaron de manera correcta
+  int num_receptors_closed;
+  sem_t sem_num_receptors_closed;
+
+  // Semaforo para esperar que los receptores y emisores terminen
+  sem_t sem_wait_all_receptors;
+  sem_t sem_wait_all_emiters;
 };
 
 // Estructura de cada posición del buffer

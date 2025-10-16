@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
       usleep(periodo * 1000); // Esperar el periodo definido
     }
 
-    // Verificar finalización
+    // Preguntar para finalizar
     sem_wait(&table->sem_finalizado);
     short fin = table->finalizado;
     sem_post(&table->sem_finalizado);
@@ -134,6 +134,7 @@ int main(int argc, char *argv[]) {
     // Leer datos del buffer
     sem_wait(&buffer[my_index].sem_read);
     char read_c = buffer[my_index].letter;
+    buffer[my_index].letter = 0;
     int read_index = buffer[my_index].index;
     time_t read_time_stamp = buffer[my_index].time_stamp;
     sem_post(&buffer[my_index].sem_write);
@@ -174,6 +175,11 @@ int main(int argc, char *argv[]) {
     printf(BLUE "[======================================================]" RESET
                 "\n");
   }
+
+  // Aumentar contador de receptores vivos
+  sem_wait(&table->sem_num_receptors_closed);
+  table->num_receptors_closed++;
+  sem_post(&table->sem_num_receptors_closed);
 
   // Limpieza final
   munmap(addr, total_size);
