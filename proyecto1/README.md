@@ -6,10 +6,26 @@ cd proyecto1/
 make
 ```
 
+## Ejemplos de ejecucion
 
-## Ejemplo de ejecuccion programa
+### Init
 ```bash
 ./build/init /memoria prueba.txt 5
-./build/emisor /memoria
-./build/receptor /memoria
+```
+
+### Emisores
+```bash
+./build/emisor /memoria 200 auto 500
+./build/emisor /memoria 200 manual
+```
+
+### Receptores
+```bash
+./build/receptor /memoria 200 auto 500
+./build/receptor /memoria 200 manual
+```
+
+### Finalizador
+```bash
+./build/finalizador /memoria
 ```
