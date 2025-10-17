@@ -1,3 +1,15 @@
+#include "init.h"
+#include <fcntl.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+
+// Colores
 #define RESET "\033[0m"
 #define RED "\033[1;31m"
 #define GREEN "\033[1;32m"
@@ -14,18 +26,37 @@
 #define BRIGHT_CYAN "\033[1;36m"
 #define BRIGHT_WHITE "\033[1;37m"
 
-#include <fcntl.h>
-#include <semaphore.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <time.h>
-#include <unistd.h>
+int fd = -1;
+void *addr = NULL;
+size_t total_size = 0;
+struct SharedTable *table = NULL;
 
-#include "init.h"
+// Manejador de señal SIGINT
+void handle_sigint(int sig) {
+  (void)sig;
+
+  // Guardar finalizacion de manera incorrecta
+  if (table != NULL) {
+    sem_wait(&table->sem_num_receptors_dead);
+    table->num_receptors_dead++;
+    sem_post(&table->sem_num_receptors_dead);
+  }
+
+  // Limpieza
+  if (addr && total_size > 0)
+    munmap(addr, total_size);
+  if (fd != -1)
+    close(fd);
+
+  printf(RED "\n[Receptor finalizado por señal SIGINT]\n" RESET);
+  exit(EXIT_SUCCESS); // Asegura que el programa termine acá
+}
 
 int main(int argc, char *argv[]) {
+  // Registrar acciones en caso de CTRL-C
+  signal(SIGINT, handle_sigint);
+
+  // Leer argumentos
   if (argc < 4) {
     fprintf(stderr,
             "Uso: %s <shm_name> <key_encriptacion> <modo: manual|auto> "
@@ -39,9 +70,10 @@ int main(int argc, char *argv[]) {
   int automatico = 0;
   int periodo = 1000; // valor por defecto
 
+  // Leer clave de encriptacion
   int key;
   int result = sscanf(argv[2], "%d", &key);
-  if (result != 1 || key > 256) {
+  if (result != 1 || key < 0 || key > 255) {
     fprintf(stderr, "Error: El argumento '%s' no es un número de 8bits.\n",
             argv[2]);
     return EXIT_FAILURE;
@@ -64,16 +96,15 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // Abrir memoria compartida
-  int fd = shm_open(shm_name, O_RDWR, 0);
+  fd = shm_open(shm_name, O_RDWR, 0);
   if (fd == -1) {
     perror("Error: no se encontró memoria compartida con nombre ingresado");
     return 1;
   }
 
   // Leer buffer_size
-  struct SharedTable *table =
-      (struct SharedTable *)mmap(NULL, sizeof(struct SharedTable),
-                                 PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  table = (struct SharedTable *)mmap(NULL, sizeof(struct SharedTable),
+                                     PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
   if (table == MAP_FAILED) {
     perror("Error: no se pudo leer tabla de memoria compartida");
@@ -87,10 +118,9 @@ int main(int argc, char *argv[]) {
   // Mapear memoria completa
   size_t table_size = sizeof(struct SharedTable);
   size_t buffer_bytes = buffer_size * sizeof(struct BufferPosition);
-  size_t total_size = table_size + buffer_bytes + 256;
+  total_size = table_size + buffer_bytes + 256;
 
-  void *addr =
-      mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  addr = mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (addr == MAP_FAILED) {
     perror("Error: no se pudo mapear memoria completa");
     close(fd);
@@ -112,18 +142,12 @@ int main(int argc, char *argv[]) {
     if (!automatico) {
       printf(BRIGHT_CYAN "[Modo Manual]" RESET " → " YELLOW
                          "Presiona Enter para leer un dato..." RESET "\n");
-      while (getchar() != '\n')
-        ; // Esperar enter
+      int ch;
+      while ((ch = getchar()) != '\n' && ch != EOF)
+        ;
     } else {
       usleep(periodo * 1000); // Esperar el periodo definido
     }
-
-    // Preguntar para finalizar
-    sem_wait(&table->sem_finalizado);
-    short fin = table->finalizado;
-    sem_post(&table->sem_finalizado);
-    if (fin)
-      break;
 
     // Obtener índice del buffer
     sem_wait(&table->sem_receptor_index);
@@ -133,6 +157,14 @@ int main(int argc, char *argv[]) {
 
     // Leer datos del buffer
     sem_wait(&buffer[my_index].sem_read);
+
+    // Preguntar para finalizar
+    sem_wait(&table->sem_finalizado);
+    short fin = table->finalizado;
+    sem_post(&table->sem_finalizado);
+    if (fin)
+      break;
+
     char read_c = buffer[my_index].letter;
     buffer[my_index].letter = 0;
     int read_index = buffer[my_index].index;
@@ -177,9 +209,26 @@ int main(int argc, char *argv[]) {
   }
 
   // Aumentar contador de receptores vivos
+  int total_receptors_closed;
   sem_wait(&table->sem_num_receptors_closed);
-  table->num_receptors_closed++;
+  total_receptors_closed = ++table->num_receptors_closed;
   sem_post(&table->sem_num_receptors_closed);
+
+  // Se leen numero de receptores totales
+  int total_receptors;
+  sem_wait(&table->sem_num_receptors);
+  total_receptors = table->num_receptors;
+  sem_post(&table->sem_num_receptors);
+
+  // Se leen numero de receptores muertos
+  int total_receptors_dead;
+  sem_wait(&table->sem_num_receptors_dead);
+  total_receptors_dead = table->num_receptors_dead;
+  sem_post(&table->sem_num_receptors_dead);
+
+  if (total_receptors_closed == total_receptors - total_receptors_dead) {
+    sem_post(&table->sem_wait_all_receptors);
+  }
 
   // Limpieza final
   munmap(addr, total_size);

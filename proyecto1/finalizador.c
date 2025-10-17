@@ -74,18 +74,11 @@ int main(int argc, char *argv[]) {
   table = (struct SharedTable *)addr;
   struct BufferPosition *buffer =
       (struct BufferPosition *)((char *)addr + table_size);
-  char *file_path = (char *)addr + table_size + buffer_bytes;
 
   // Activo la variable
   sem_wait(&table->sem_finalizado);
   table->finalizado = 1;
   sem_post(&table->sem_finalizado);
-
-  // Se leen caracteres transferidos
-  int transfered_char;
-  sem_wait(&table->sem_transfer_char);
-  transfered_char = table->transfer_char;
-  sem_post(&table->sem_transfer_char);
 
   // Se leen numero de receptores totales
   int total_receptors;
@@ -98,6 +91,46 @@ int main(int argc, char *argv[]) {
   sem_wait(&table->sem_num_emiters);
   total_emiters = table->num_emiters;
   sem_post(&table->sem_num_emiters);
+
+  // Se leen numero de receptores muertos
+  int total_receptors_dead;
+  sem_wait(&table->sem_num_receptors_dead);
+  total_receptors_dead = table->num_receptors_dead;
+  sem_post(&table->sem_num_receptors_dead);
+
+  // Se leen numero de emisores muertos
+  int total_emiters_dead;
+  sem_wait(&table->sem_num_emiters_dead);
+  total_emiters_dead = table->num_emiters_dead;
+  sem_post(&table->sem_num_emiters_dead);
+
+  // Se abren los semaforos de todos para que entren y verifiquen finalizacion
+  for (short i = 0; i < buffer_size; i++) {
+    for (short j = 0; j < (total_emiters - total_emiters_dead); j++) {
+      sem_post(&buffer[i].sem_write);
+    }
+
+    for (short j = 0; j < (total_receptors - total_receptors_dead); j++) {
+      sem_post(&buffer[i].sem_read);
+    }
+  }
+
+  // Esperar a que cierren todos los procesos
+  if (total_emiters - total_emiters_dead > 0) {
+    printf(GREEN "Esperando finalizacion emisores...\n");
+    sem_wait(&table->sem_wait_all_emiters);
+  }
+
+  if (total_receptors - total_receptors_dead > 0) {
+    printf(GREEN "Esperando finalizacion receptores...\n");
+    sem_wait(&table->sem_wait_all_receptors);
+  }
+
+  // Se leen caracteres transferidos
+  int transfered_char;
+  sem_wait(&table->sem_transfer_char);
+  transfered_char = table->transfer_char;
+  sem_post(&table->sem_transfer_char);
 
   // Se leen numero de receptores totales
   int live_receptors;

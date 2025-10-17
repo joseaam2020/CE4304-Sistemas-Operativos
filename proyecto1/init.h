@@ -40,6 +40,10 @@ struct SharedTable {
   int num_emiters_closed;
   sem_t sem_num_emiters_closed;
 
+  // Contador emisores terminaron de manera incorrecta
+  int num_emiters_dead;
+  sem_t sem_num_emiters_dead;
+
   // Contador de receptores totales
   int num_receptors;
   sem_t sem_num_receptors;
@@ -47,6 +51,10 @@ struct SharedTable {
   // Contador receptores terminaron de manera correcta
   int num_receptors_closed;
   sem_t sem_num_receptors_closed;
+
+  // Contador receptores terminaron de manera incorrecta
+  int num_receptors_dead;
+  sem_t sem_num_receptors_dead;
 
   // Semaforo para esperar que los receptores y emisores terminen
   sem_t sem_wait_all_receptors;
