@@ -204,8 +204,6 @@ int main(int argc, char *argv[]) {
 
     time_t write_time = time(NULL);
 
-    printf("My index: %d\n", my_index);
-
     // Escribir en el buffer
     sem_wait(&buffer[my_index].sem_write);
 
@@ -250,9 +248,6 @@ int main(int argc, char *argv[]) {
   sem_wait(&table->sem_num_emiters_dead);
   total_emiters_dead = table->num_emiters_dead;
   sem_post(&table->sem_num_emiters_dead);
-
-  printf("Cerrados: %d, Totales: %d, Muertos: %d", total_emiters_closed,
-         total_emiters, total_emiters_dead);
 
   if (total_emiters_closed == total_emiters - total_emiters_dead) {
     printf("Haciendo post");
