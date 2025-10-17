@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <semaphore.h>
 #include <signal.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,25 +32,10 @@ void *addr = NULL;
 size_t total_size = 0;
 struct SharedTable *table = NULL;
 
-// Manejador de señal SIGINT
+volatile sig_atomic_t terminar_externo = 0;
 void handle_sigint(int sig) {
-  (void)sig;
-
-  // Guardar finalizacion de manera incorrecta
-  if (table != NULL) {
-    sem_wait(&table->sem_num_receptors_dead);
-    table->num_receptors_dead++;
-    sem_post(&table->sem_num_receptors_dead);
-  }
-
-  // Limpieza
-  if (addr && total_size > 0)
-    munmap(addr, total_size);
-  if (fd != -1)
-    close(fd);
-
-  printf(RED "\n[Receptor finalizado por señal SIGINT]\n" RESET);
-  exit(EXIT_SUCCESS); // Asegura que el programa termine acá
+  (void)sig; // evitar warning
+  terminar_externo = 1;
 }
 
 int main(int argc, char *argv[]) {
@@ -96,15 +82,16 @@ int main(int argc, char *argv[]) {
     return 1;
   }
   // Abrir memoria compartida
-  fd = shm_open(shm_name, O_RDWR, 0);
+  int fd = shm_open(shm_name, O_RDWR, 0);
   if (fd == -1) {
     perror("Error: no se encontró memoria compartida con nombre ingresado");
     return 1;
   }
 
   // Leer buffer_size
-  table = (struct SharedTable *)mmap(NULL, sizeof(struct SharedTable),
-                                     PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  struct SharedTable *table =
+      (struct SharedTable *)mmap(NULL, sizeof(struct SharedTable),
+                                 PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
   if (table == MAP_FAILED) {
     perror("Error: no se pudo leer tabla de memoria compartida");
@@ -118,7 +105,7 @@ int main(int argc, char *argv[]) {
   // Mapear memoria completa
   size_t table_size = sizeof(struct SharedTable);
   size_t buffer_bytes = buffer_size * sizeof(struct BufferPosition);
-  total_size = table_size + buffer_bytes + 256;
+  size_t total_size = table_size + buffer_bytes + 256;
 
   addr = mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (addr == MAP_FAILED) {
@@ -138,6 +125,10 @@ int main(int argc, char *argv[]) {
 
   // Loop principal
   while (1) {
+    if (terminar_externo) { // Terminar externo
+      break;
+    }
+
     // Modo manual: esperar enter
     if (!automatico) {
       printf(BRIGHT_CYAN "[Modo Manual]" RESET " → " YELLOW
@@ -208,26 +199,37 @@ int main(int argc, char *argv[]) {
                 "\n");
   }
 
-  // Aumentar contador de receptores vivos
-  int total_receptors_closed;
-  sem_wait(&table->sem_num_receptors_closed);
-  total_receptors_closed = ++table->num_receptors_closed;
-  sem_post(&table->sem_num_receptors_closed);
+  if (terminar_externo) {
+    // Guardar finalizacion de manera incorrecta
+    sem_wait(&table->sem_num_receptors_dead);
+    table->num_receptors_dead++;
+    sem_post(&table->sem_num_receptors_dead);
 
-  // Se leen numero de receptores totales
-  int total_receptors;
-  sem_wait(&table->sem_num_receptors);
-  total_receptors = table->num_receptors;
-  sem_post(&table->sem_num_receptors);
+  } else {
+    // Aumentar contador de receptores vivos
+    int total_receptors_closed;
+    sem_wait(&table->sem_num_receptors_closed);
+    total_receptors_closed = ++table->num_receptors_closed;
+    sem_post(&table->sem_num_receptors_closed);
 
-  // Se leen numero de receptores muertos
-  int total_receptors_dead;
-  sem_wait(&table->sem_num_receptors_dead);
-  total_receptors_dead = table->num_receptors_dead;
-  sem_post(&table->sem_num_receptors_dead);
+    // Se leen numero de receptores totales
+    int total_receptors;
+    sem_wait(&table->sem_num_receptors);
+    total_receptors = table->num_receptors;
+    sem_post(&table->sem_num_receptors);
 
-  if (total_receptors_closed == total_receptors - total_receptors_dead) {
-    sem_post(&table->sem_wait_all_receptors);
+    // Se leen numero de receptores muertos
+    int total_receptors_dead;
+    sem_wait(&table->sem_num_receptors_dead);
+    total_receptors_dead = table->num_receptors_dead;
+    sem_post(&table->sem_num_receptors_dead);
+
+    printf("Closed: %d, Total: %d, Dead: %d", total_receptors_closed,
+           total_receptors, total_receptors_dead);
+
+    if (total_receptors_closed == total_receptors - total_receptors_dead) {
+      sem_post(&table->sem_wait_all_receptors);
+    }
   }
 
   // Limpieza final

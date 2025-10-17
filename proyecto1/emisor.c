@@ -29,33 +29,10 @@
 #define BRIGHT_CYAN "\033[1;36m"
 #define BRIGHT_WHITE "\033[1;37m"
 
-int fd;
-int file_fd;
-void *addr;
-size_t total_size;
-struct SharedTable *table = NULL;
-
-// Manejador de señal SIGINT
+volatile sig_atomic_t terminar_externo = 0;
 void handle_sigint(int sig) {
-  (void)sig;
-
-  // Guardar finalizacion de manera incorrecta
-  if (table != NULL) {
-    sem_wait(&table->sem_num_emiters_dead);
-    table->num_emiters_dead++;
-    sem_post(&table->sem_num_emiters_dead);
-  }
-
-  // Limpieza
-  if (file_fd != -1)
-    close(file_fd);
-  if (addr && total_size > 0)
-    munmap(addr, total_size);
-  if (fd != -1)
-    close(fd);
-
-  printf(RED "\n[Emisor finalizado por señal SIGINT]\n" RESET);
-  exit(EXIT_SUCCESS); // Asegura que el programa termine acá
+  (void)sig; // evitar warning
+  terminar_externo = 1;
 }
 
 int main(int argc, char *argv[]) {
@@ -106,15 +83,16 @@ int main(int argc, char *argv[]) {
   const char *shm_name = argv[1];
 
   // Abrir memoria compartida
-  fd = shm_open(shm_name, O_RDWR, 0);
+  int fd = shm_open(shm_name, O_RDWR, 0);
   if (fd == -1) {
     perror("shm_open");
     return 1;
   }
 
   // Leer tabla para obtener buffer_size
-  table = (struct SharedTable *)mmap(NULL, sizeof(struct SharedTable),
-                                     PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  struct SharedTable *table =
+      (struct SharedTable *)mmap(NULL, sizeof(struct SharedTable),
+                                 PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (table == MAP_FAILED) {
     perror("mmap");
     close(fd);
@@ -127,7 +105,7 @@ int main(int argc, char *argv[]) {
   // Mapear memoria completa
   size_t table_size = sizeof(struct SharedTable);
   size_t buffer_bytes = buffer_size * sizeof(struct BufferPosition);
-  total_size = table_size + buffer_bytes + 256;
+  size_t total_size = table_size + buffer_bytes + 256;
 
   void *addr =
       mmap(NULL, total_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
@@ -147,7 +125,7 @@ int main(int argc, char *argv[]) {
   printf(BRIGHT_CYAN "[INFO]" RESET " → Archivo: %s\n", file_path);
 
   // Abrir archivo
-  file_fd = open(file_path, O_RDONLY);
+  int file_fd = open(file_path, O_RDONLY);
   if (file_fd == -1) {
     perror("open archivo");
     munmap(addr, total_size);
@@ -162,6 +140,11 @@ int main(int argc, char *argv[]) {
 
   // Loop principal
   while (1) {
+    if (terminar_externo) { // Terminar externo
+      break;
+    }
+
+    // Modo
     if (!automatico) {
       printf(GRAY "\n[Modo Manual] Presiona Enter para encriptar y "
                   "escribir...\n" RESET);
@@ -231,29 +214,36 @@ int main(int argc, char *argv[]) {
     if (!c)
       break;
   }
-  // Aumentar contador de emisores vivos
-  int total_emiters_closed;
-  sem_wait(&table->sem_num_emiters_closed);
-  total_emiters_closed = ++table->num_emiters_closed;
-  sem_post(&table->sem_num_emiters_closed);
+  if (terminar_externo) {
+    // Guardar finalizacion de manera incorrecta
+    sem_wait(&table->sem_num_emiters_dead);
+    table->num_emiters_dead++;
+    sem_post(&table->sem_num_emiters_dead);
 
-  // Se leen numero de emisores totales
-  int total_emiters;
-  sem_wait(&table->sem_num_emiters);
-  total_emiters = table->num_emiters;
-  sem_post(&table->sem_num_emiters);
+  } else {
+    // Aumentar contador de emisores vivos
+    int total_emiters_closed;
+    sem_wait(&table->sem_num_emiters_closed);
+    total_emiters_closed = ++table->num_emiters_closed;
+    sem_post(&table->sem_num_emiters_closed);
 
-  // Se leen numero de emisores muertos
-  int total_emiters_dead;
-  sem_wait(&table->sem_num_emiters_dead);
-  total_emiters_dead = table->num_emiters_dead;
-  sem_post(&table->sem_num_emiters_dead);
+    // Se leen numero de emisores totales
+    int total_emiters;
+    sem_wait(&table->sem_num_emiters);
+    total_emiters = table->num_emiters;
+    sem_post(&table->sem_num_emiters);
 
-  if (total_emiters_closed == total_emiters - total_emiters_dead) {
-    printf("Haciendo post");
-    sem_post(&table->sem_wait_all_emiters);
+    // Se leen numero de emisores muertos
+    int total_emiters_dead;
+    sem_wait(&table->sem_num_emiters_dead);
+    total_emiters_dead = table->num_emiters_dead;
+    sem_post(&table->sem_num_emiters_dead);
+
+    if (total_emiters_closed == total_emiters - total_emiters_dead) {
+      printf("Haciendo post");
+      sem_post(&table->sem_wait_all_emiters);
+    }
   }
-
   // Limpieza
   close(file_fd);
   munmap(addr, total_size);
