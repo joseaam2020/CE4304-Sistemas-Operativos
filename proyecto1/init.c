@@ -48,6 +48,19 @@ int main(int argc, char *argv[]) {
   const char *shm_name = argv[1];
   const char *file_path = argv[2];
 
+  // Verificando el que el archivo exista y se pueda leer
+  if (access(file_path, F_OK) != 0) {
+    fprintf(stderr, RED "Error: El archivo '%s' no existe.\n" RESET, file_path);
+    return EXIT_FAILURE;
+  }
+
+  if (access(file_path, R_OK) != 0) {
+    fprintf(stderr,
+            RED "Error: No tienes permisos de lectura para '%s'.\n" RESET,
+            file_path);
+    return EXIT_FAILURE;
+  }
+
   int buffer_size;
   int result = sscanf(argv[3], "%d", &buffer_size);
 
